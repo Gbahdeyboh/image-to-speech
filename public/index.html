@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Firebase App is always required and must be first -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <!-- Add Firebase products that you want to use -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-storage-compat.js"></script>
+    <title>Document</title>
+    <style>
+        * {
+            background-color: antiquewhite;
+            font-family: 'Agbalumo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .heading {
+            padding: 20px;
+            margin: 50px auto;
+            width: 800px;
+        }
+
+        h1 {
+            margin: 20px auto;  
+        }
+
+        .btn {
+            border-radius: 10px;
+            border: 2px solid black;
+            text-align: center;
+            height: 35px;
+            width: 200px;
+            background-color: bisque;
+            color: black;
+            margin: 20px auto;
+            display: block;
+            cursor: pointer;
+        }
+
+        img {
+            width: 350px;
+            height: 350px;
+            border-radius: 5px;
+        }
+
+        .boxbtn {
+            border-radius: 15px;
+            height: auto;
+            padding: 10px;
+            width: 210px;
+            margin: 10px auto;
+            font-size: 25px;
+            text-align: center;
+        }
+
+         /* Style for the progress bar */
+         #progress-bar-container {
+            width: 100%;
+            background-color: #ddd;
+        }
+
+        #progress-bar {
+            width: 1%;
+            height: 30px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="heading">
+            <h1>Welcome to Smart Glasses, where your eyewear can read it all ...</h1>
+        </div>
+
+        <section>
+            <div class="boxbtn">
+                <label for="my-file">Input an image:</label>
+                <input type="file" id="my-file" accept="image/png, image/jpeg" onchange="loadFile(event)">
+                <img id="output" width="200" style="margin-top: 15px;"/>
+                <button type="button" class="btn">Upload Image</button>
+                <!-- Progress bar container -->
+                <div id="progress-bar-container">
+                    <div id="progress-bar">0%</div>
+                </div>
+                <audio id="audioPlayer" controls style="display: none;"></audio>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // TODO: Replace with your project's Firebase configuration object
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_1-yC7PL9kfhp06iRygTY1VEnfM37Tr0",
+            authDomain: "debo-d791b.firebaseapp.com",
+            databaseURL: "https://debo-d791b.firebaseio.com",
+            projectId: "debo-d791b",
+            storageBucket: "debo-d791b.appspot.com",
+            messagingSenderId: "121504974373",
+            appId: "1:121504974373:web:7fdfe7e4f668009b3c61cc"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const storage = firebase.storage();
+
+         // Function to update the progress bar
+         function updateProgressBar(progress) {
+            const progressBar = document.getElementById('progress-bar');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = progress + '%';
+        }
+
+        // Function to upload the image to Firebase Storage
+        function uploadToFirebase(file) {
+            return new Promise((resolve, reject) => {
+                const storageRef = storage.ref('images/' + file.name);
+                const uploadTask = storageRef.put(file);
+
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        // Observe state change events such as progress, pause, and resume
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        console.log('Upload is ' + progress + '% done');
+                        updateProgressBar(progress.toFixed(0)); // Update the progress bar
+                    }, 
+                    (error) => {
+                        // Handle unsuccessful uploads
+                        reject(error);
+                    }, 
+                    () => {
+                        // Handle successful uploads on complete
+                        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                            updateProgressBar(100); // Set the progress bar to 100% upon completion
+                            resolve(downloadURL);
+                        });
+                    }
+                );
+            });
+        }
+
+        // Function to send the image URL to your server
+        function sendImageUrlToServer(imageUrl) {
+            const payload = { image: imageUrl };
+            fetch('http://localhost:3000/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                // Assuming the API response is { audioUrl: 'URL_TO_AUDIO_FILE' }
+                playAudio(data.audioUrl);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Function to play audio
+        function playAudio(audioUrl) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            audioPlayer.src = audioUrl;
+            audioPlayer.style.display = 'block'; // Show the audio player if you want to give control to the user
+            audioPlayer.play();
+        }
+
+        // Function to handle the image upload process
+        function handleImageUpload() {
+            const fileInput = document.getElementById('my-file');
+            const file = fileInput.files[0];
+            if (file) {
+                uploadToFirebase(file)
+                    .then(sendImageUrlToServer)
+                    .catch((error) => {
+                        console.error('Upload Error:', error);
+                    });
+            } else {
+                alert('Please select an image file first.');
+            }
+        }
+
+        document.querySelector('.btn').addEventListener('click', handleImageUpload);
+
+        // Function to display the selected image before uploading
+        var loadFile = function(event) {
+            var image = document.getElementById('output');
+            image.src = URL.createObjectURL(event.target.files[0]);
+        };
+    </script>
+</body>
+</html>
